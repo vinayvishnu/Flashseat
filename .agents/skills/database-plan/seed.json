@@ -1,0 +1,75 @@
+{
+  "users": [
+    {
+      "_id": "60d5ecb8b311234567890123",
+      "name": "Admin User",
+      "email": "admin@flashseat.com",
+      "passwordHash": "$2b$10$hashedpasswordhere",
+      "role": "ADMIN"
+    },
+    {
+      "_id": "60d5ecb8b311234567890124",
+      "name": "Demo User",
+      "email": "demo@example.com",
+      "passwordHash": "$2b$10$hashedpasswordhere",
+      "role": "USER"
+    }
+  ],
+  "stadiums": [
+    {
+      "_id": "60d5ecb8b311234567890200",
+      "name": "Wankhede Stadium",
+      "city": "Mumbai",
+      "sections": ["VIP", "North Stand", "South Stand"]
+    },
+    {
+      "_id": "60d5ecb8b311234567890201",
+      "name": "M. Chinnaswamy Stadium",
+      "city": "Bengaluru",
+      "sections": ["VIP", "East Stand", "West Stand"]
+    }
+  ],
+  "events": [
+    {
+      "_id": "60d5ecb8b311234567890300",
+      "stadiumId": "60d5ecb8b311234567890200",
+      "title": "Mumbai Indians vs Chennai Super Kings",
+      "date": "2026-04-15T19:30:00Z",
+      "basePrice": 1500
+    },
+    {
+      "_id": "60d5ecb8b311234567890301",
+      "stadiumId": "60d5ecb8b311234567890201",
+      "title": "Royal Challengers Bengaluru vs Kolkata Knight Riders",
+      "date": "2026-04-18T19:30:00Z",
+      "basePrice": 2000
+    }
+  ],
+  "seats": [
+    {
+      "_id": "60d5ecb8b311234567890400",
+      "eventId": "60d5ecb8b311234567890300",
+      "section": "VIP",
+      "seatNumber": "A01",
+      "status": "AVAILABLE",
+      "price": 5000
+    },
+    {
+      "_id": "60d5ecb8b311234567890401",
+      "eventId": "60d5ecb8b311234567890300",
+      "section": "VIP",
+      "seatNumber": "A02",
+      "status": "AVAILABLE",
+      "price": 5000
+    },
+    {
+      "_id": "60d5ecb8b311234567890402",
+      "eventId": "60d5ecb8b311234567890300",
+      "section": "North Stand",
+      "seatNumber": "N01",
+      "status": "AVAILABLE",
+      "price": 1500
+    }
+  ],
+  "bookings": []
+}

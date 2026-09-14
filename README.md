@@ -1,32 +1,68 @@
-# React + TypeScript + Vite
+# 🎟️ FlashSeat
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+### High-Concurrency Ticket Booking Platform
 
-Currently, two official plugins are available:
+> A backend-focused ticket booking system designed to handle concurrent seat reservations, prevent double booking, process bookings asynchronously, and provide real-time updates.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+<div align="center">
 
-## React Compiler
+![TypeScript](https://img.shields.io/badge/TypeScript-Backend-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-Backend-339933?style=for-the-badge&logo=node.js&logoColor=white)
+![Express.js](https://img.shields.io/badge/Express.js-API-000000?style=for-the-badge&logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-Database-47A248?style=for-the-badge&logo=mongodb&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Locking%20%26%20Caching-DC382D?style=for-the-badge&logo=redis&logoColor=white)
+![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-Events-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)
+![Socket.io](https://img.shields.io/badge/Socket.io-Real--Time-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+![JWT](https://img.shields.io/badge/JWT-Authentication-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Containerization-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+</div>
 
-## Expanding the Oxlint configuration
+---
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## 📌 About the Project
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
+FlashSeat is a high-concurrency ticket booking platform focused on solving backend challenges that occur when multiple users try to book limited seats simultaneously.
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The system uses **Redis distributed locking** to prevent duplicate seat reservations, **Kafka** for asynchronous booking processing, **MongoDB** for persistent data storage, and **Socket.io** for real-time updates.
+
+---
+
+## ⚡ Core Backend Features
+
+- 🔒 Redis distributed locking for concurrent seat booking
+- 📨 Kafka-based asynchronous booking processing
+- 🗄️ MongoDB persistent data storage
+- 🔴 Socket.io real-time booking updates
+- 🔐 JWT-based authentication
+- 🔄 Saga-style failure compensation
+- ⚡ Redis caching
+- 🧩 RESTful backend APIs
+- 🐳 Docker-based infrastructure
+
+---
+
+## 🔄 Booking Flow
+
+```text
+User
+  ↓
+Select Event & Seat
+  ↓
+Express API
+  ↓
+JWT Authentication
+  ↓
+Redis Seat Lock
+  ↓
+Kafka Booking Event
+  ↓
+Booking Worker
+  ↓
+Payment / Processing
+  ↓
+MongoDB
+  ↓
+Socket.io
+  ↓
+Real-Time Booking Update

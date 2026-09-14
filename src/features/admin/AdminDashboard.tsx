@@ -8,6 +8,7 @@ import {
   updateAvailableSeats,
   configureMatchPrice 
 } from '../../store/adminSlice';
+import { socket } from '../../services/socket';
 import { ShieldAlert, Play, Pause, Users, Settings, Sliders, Ticket, Check, Edit2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -39,12 +40,15 @@ export const AdminDashboard: React.FC = () => {
   const handlePriceUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMatchId) return;
-    dispatch(configureMatchPrice({
+    const pricePayload = {
       matchId: selectedMatchId,
       vip: parseInt(vipPrice),
       premium: parseInt(premPrice),
       general: parseInt(genPrice),
-    }));
+    };
+    dispatch(configureMatchPrice(pricePayload));
+    // Broadcast to all user browsers via socket
+    socket.emit('admin:config_update', { type: 'configureMatchPrice', data: pricePayload });
     setPriceSuccess(true);
     setTimeout(() => setPriceSuccess(false), 2000);
   };
@@ -65,7 +69,10 @@ export const AdminDashboard: React.FC = () => {
 
         {/* Global Pause Switch */}
         <button
-          onClick={() => dispatch(toggleGlobalSalePause())}
+          onClick={() => {
+            dispatch(toggleGlobalSalePause());
+            socket.emit('admin:config_update', { type: 'toggleGlobalSalePause', data: {} });
+          }}
           className={`flex items-center gap-1.5 px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md ${
             isGlobalSalePaused
               ? 'bg-success hover:opacity-90 text-white shadow-success/15'
@@ -111,6 +118,7 @@ export const AdminDashboard: React.FC = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       dispatch(toggleFlashSale(m.id));
+                      socket.emit('admin:config_update', { type: 'toggleFlashSale', data: { matchId: m.id } });
                     }}
                     className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
                       m.isFlashSaleActive
@@ -218,7 +226,11 @@ export const AdminDashboard: React.FC = () => {
               max="10"
               step="1"
               value={simulatedQueueSpeed}
-              onChange={(e) => dispatch(adjustQueueSpeed(Number(e.target.value)))}
+              onChange={(e) => {
+                const speed = Number(e.target.value);
+                dispatch(adjustQueueSpeed(speed));
+                socket.emit('admin:config_update', { type: 'adjustQueueSpeed', data: { speed } });
+              }}
               className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-secondary"
             />
             <span className="text-[10px] text-foreground/45 block leading-normal">
@@ -232,13 +244,19 @@ export const AdminDashboard: React.FC = () => {
               <span className="text-xs font-bold text-foreground/75 uppercase tracking-wide block">Manual Ticket Replenishment</span>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => dispatch(updateAvailableSeats({ matchId: selectedMatch.id, delta: 50 }))}
+                  onClick={() => {
+                    dispatch(updateAvailableSeats({ matchId: selectedMatch.id, delta: 50 }));
+                    socket.emit('admin:config_update', { type: 'updateAvailableSeats', data: { matchId: selectedMatch.id, delta: 50 } });
+                  }}
                   className="py-2 px-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold text-foreground/80 transition-all"
                 >
                   Add +50 Seats
                 </button>
                 <button
-                  onClick={() => dispatch(updateAvailableSeats({ matchId: selectedMatch.id, delta: -50 }))}
+                  onClick={() => {
+                    dispatch(updateAvailableSeats({ matchId: selectedMatch.id, delta: -50 }));
+                    socket.emit('admin:config_update', { type: 'updateAvailableSeats', data: { matchId: selectedMatch.id, delta: -50 } });
+                  }}
                   className="py-2 px-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold text-foreground/80 transition-all"
                 >
                   Subtract -50 Seats

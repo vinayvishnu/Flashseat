@@ -10,7 +10,7 @@ interface AdminState {
 
 const initialMatches: Match[] = [
   {
-    id: 'match-1',
+    id: '60d5ecb8b311234567890300',
     title: 'Mumbai Indians vs Chennai Super Kings',
     teams: {
       home: { name: 'Mumbai Indians', short: 'MI', logo: '⚡', color: '#004BA0' },
@@ -27,7 +27,7 @@ const initialMatches: Match[] = [
     flashSaleStartTime: '2026-06-24T20:00:00Z',
   },
   {
-    id: 'match-2',
+    id: '60d5ecb8b311234567890301',
     title: 'Royal Challengers Bengaluru vs Kolkata Knight Riders',
     teams: {
       home: { name: 'Royal Challengers Bengaluru', short: 'RCB', logo: '👑', color: '#EC1C24' },
@@ -44,7 +44,7 @@ const initialMatches: Match[] = [
     flashSaleStartTime: '2026-06-25T18:00:00Z',
   },
   {
-    id: 'match-3',
+    id: '60d5ecb8b311234567890302',
     title: 'Delhi Capitals vs Rajasthan Royals',
     teams: {
       home: { name: 'Delhi Capitals', short: 'DC', logo: '🐯', color: '#0078BC' },

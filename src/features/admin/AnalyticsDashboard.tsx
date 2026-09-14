@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -12,7 +12,8 @@ import {
   PieChart, 
   Pie 
 } from 'recharts';
-import { TrendingUp, Users, DollarSign, Activity, ShoppingCart } from 'lucide-react';
+import { io as ioClient } from 'socket.io-client';
+import { TrendingUp, Users, DollarSign, Activity, ShoppingCart, Terminal, Shield, Play } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 // Mock data arrays for charts
@@ -47,6 +48,190 @@ const recentLogs = [
 ];
 
 export const AnalyticsDashboard: React.FC = () => {
+  const [testLogs, setTestLogs] = useState<string[]>(['🔬 Test Lab initialized. Select a test suite above to begin simulation...']);
+  const [runningTest, setRunningTest] = useState<string | null>(null);
+
+  const addLog = (msg: string) => {
+    setTestLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+  };
+
+  const runAuthTest = async () => {
+    setRunningTest('auth');
+    setTestLogs([]);
+    addLog('🚀 Starting Authentication REST API integration tests...');
+    
+    try {
+      const email = `test_${Date.now()}@flashseat.ai`;
+      const password = 'Password123!';
+
+      // 1. Register
+      addLog('⏳ 1. Sending POST /auth/register...');
+      const regRes = await fetch('http://localhost:5000/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Frontend Tester', email, password })
+      });
+      const regData = await regRes.json();
+      addLog(`🔹 Response status: ${regRes.status}. Success: ${regData.success}`);
+      if (regRes.status !== 201) throw new Error('Registration failed');
+      const token = regData.data.token;
+
+      // 2. Login
+      addLog('⏳ 2. Sending POST /auth/login...');
+      const logRes = await fetch('http://localhost:5000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const logData = await logRes.json();
+      addLog(`🔹 Response status: ${logRes.status}. Token: ${logData.data?.token ? 'Verified' : 'Missing'}`);
+
+      // 3. Profile me
+      addLog('⏳ 3. Sending GET /auth/me (authenticated)...');
+      const meRes = await fetch('http://localhost:5000/api/v1/auth/me', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const meData = await meRes.json();
+      addLog(`🔹 Response status: ${meRes.status}. User Name: ${meData.data?.name}`);
+
+      addLog('🎉 AUTHENTICATION TEST COMPLETED SUCCESSFULLY!');
+    } catch (e: any) {
+      addLog(`❌ Test Failed: ${e.message}`);
+    } finally {
+      setRunningTest(null);
+    }
+  };
+
+  const runConcurrencyTest = async () => {
+    setRunningTest('concurrency');
+    setTestLogs([]);
+    addLog('🚀 Starting Concurrency & Distributed Lock Race Condition Test...');
+    
+    try {
+      // 1. Authenticate user to get token
+      addLog('⏳ 1. Authenticating test runner session...');
+      const loginRes = await fetch('http://localhost:5000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'demo@example.com', password: 'user123' })
+      });
+      const loginData = await loginRes.json();
+      if (!loginData.success) throw new Error('Login failed');
+      const token = loginData.data.token;
+
+      // 2. Fetch matches to get active eventId
+      addLog('⏳ 2. Querying active match configurations...');
+      const matchesRes = await fetch('http://localhost:5000/api/v1/events');
+      const matchesData = await matchesRes.json();
+      if (!matchesData.success || matchesData.data.length === 0) throw new Error('No matches found. Please seed the DB.');
+      const eventId = matchesData.data[0]._id;
+
+      // 3. Race condition lock requests
+      const seatNumber = `C-GEN-${Math.floor(Math.random() * 50) + 50}`;
+      addLog(`⏳ 3. Sending 10 parallel booking lock requests for seat ${seatNumber}...`);
+
+      const requests = Array.from({ length: 10 }, () =>
+        fetch('http://localhost:5000/api/v1/booking/start', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ eventId, seatNumber })
+        })
+      );
+
+      const responses = await Promise.all(requests);
+      let success = 0;
+      let blocked = 0;
+
+      for (let i = 0; i < responses.length; i++) {
+        const status = responses[i].status;
+        const body = await responses[i].json();
+        if (status === 202) {
+          success++;
+          addLog(`   👉 Req #${i+1}: 202 Accepted (Acquired Redis Lock)`);
+        } else if (status === 409) {
+          blocked++;
+          addLog(`   👉 Req #${i+1}: 409 Conflict (Rejected by Redis Lock)`);
+        } else {
+          addLog(`   👉 Req #${i+1}: ${status} ${body.error}`);
+        }
+      }
+
+      addLog(`\n📊 Concurrency Report:`);
+      addLog(`🔹 Redis Lock Acquired (202): ${success}`);
+      addLog(`🔸 Rejected Concurrency (409): ${blocked}`);
+
+      if (success === 1 && blocked === 9) {
+        addLog('🎉 CONCURRENCY LOCK TEST PASSED SUCCESSFULLY!');
+      } else {
+        addLog('⚠️ Test Completed with unexpected lock ratios');
+      }
+    } catch (e: any) {
+      addLog(`❌ Test Failed: ${e.message}`);
+    } finally {
+      setRunningTest(null);
+    }
+  };
+
+  const runSagaTest = async () => {
+    setRunningTest('saga');
+    setTestLogs([]);
+    addLog('🚀 Starting E2E Kafka Saga & Compensation Rollback Test...');
+    
+    try {
+      // 1. Authenticate
+      addLog('⏳ 1. Authenticating user...');
+      const loginRes = await fetch('http://localhost:5000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'demo@example.com', password: 'user123' })
+      });
+      const loginData = await loginRes.json();
+      const token = loginData.data.token;
+
+      // 2. Fetch matches to get active eventId
+      const matchesRes = await fetch('http://localhost:5000/api/v1/events');
+      const matchesData = await matchesRes.json();
+      const eventId = matchesData.data[0]._id;
+
+      // 3. Lock seat ending in "09" to force payment failure & Saga rollback
+      const seatNumber = 'C-GEN-9';
+      addLog(`⏳ 2. Locking seat ${seatNumber} (triggers automatic Saga failure/rollback)...`);
+      const lockRes = await fetch('http://localhost:5000/api/v1/booking/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ eventId, seatNumber })
+      });
+      const lockData = await lockRes.json();
+      if (lockRes.status !== 202) throw new Error(lockData.error || 'Lock failed');
+      const bookingId = lockData.data.bookingId;
+      addLog(`🔹 Seat locked. Booking ID: ${bookingId}. Connecting Socket...`);
+
+      // 4. Connect to WebSockets to listen to progress
+      const testSocket = ioClient('http://localhost:5000');
+      testSocket.emit('join', bookingId);
+      addLog('📡 Socket connected & joined transaction progress room.');
+
+      testSocket.on('booking:progress', (data: any) => {
+        addLog(`🔔 Socket Alert: [Saga Status: ${data.status}] - ${data.message}`);
+        if (data.status === 'FAILED') {
+          addLog('🎉 SUCCESS: Saga compensation rollback confirmed! Seat released.');
+          testSocket.disconnect();
+          setRunningTest(null);
+        }
+      });
+
+    } catch (e: any) {
+      addLog(`❌ Test Failed: ${e.message}`);
+      setRunningTest(null);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 flex-grow">
       {/* Page Header */}
@@ -198,19 +383,79 @@ export const AnalyticsDashboard: React.FC = () => {
           </div>
           
           <div className="space-y-3">
-            {recentLogs.map((log) => (
-              <div key={log.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center text-xs">
-                <div>
-                  <div className="font-bold">{log.user}</div>
-                  <div className="text-[10px] text-foreground/40 mt-0.5">Seats: {log.seats} • {log.time}</div>
+            {recentLogs.map((log) => {
+              return (
+                <div key={log.id} className="p-3 rounded-xl bg-white/5 border border-white/5 flex justify-between items-center text-xs">
+                  <div>
+                    <div className="font-bold">{log.user}</div>
+                    <div className="text-[10px] text-foreground/40 mt-0.5">Seats: {log.seats} • {log.time}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-success">₹{log.amount.toLocaleString('en-IN')}</div>
+                    <div className="text-[9px] font-mono text-accent mt-0.5">{log.id}</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold text-success">₹{log.amount.toLocaleString('en-IN')}</div>
-                  <div className="text-[9px] font-mono text-accent mt-0.5">{log.id}</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+        </div>
+      </div>
+
+      {/* Simulation Lab Panel */}
+      <div className="glass rounded-3xl p-6 border border-white/5 space-y-6 mt-8">
+        <div className="flex justify-between items-center border-b border-white/5 pb-4">
+          <div>
+            <h3 className="text-base font-bold uppercase tracking-wider text-foreground/80 font-display flex items-center gap-2">
+              <Shield className="h-5 w-5 text-accent" />
+              <span>🔬 Interactive E2E Simulation & Testing Lab</span>
+            </h3>
+            <p className="text-xs text-foreground/50 mt-1">
+              Verify authentication, distributed locks, and Kafka Saga rollbacks directly inside the web interface.
+            </p>
+          </div>
+        </div>
+
+        {/* Buttons Controls */}
+        <div className="flex flex-wrap gap-4">
+          <button
+            disabled={runningTest !== null}
+            onClick={runAuthTest}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 text-primary text-xs font-bold transition-all disabled:opacity-50"
+          >
+            <Play className="h-3.5 w-3.5" />
+            <span>Test Auth REST APIs</span>
+          </button>
+
+          <button
+            disabled={runningTest !== null}
+            onClick={runConcurrencyTest}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent/10 border border-accent/20 hover:bg-accent/20 text-accent text-xs font-bold transition-all disabled:opacity-50"
+          >
+            <Play className="h-3.5 w-3.5" />
+            <span>Test Concurrency Lock</span>
+          </button>
+
+          <button
+            disabled={runningTest !== null}
+            onClick={runSagaTest}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-secondary/10 border border-secondary/20 hover:bg-secondary/20 text-secondary text-xs font-bold transition-all disabled:opacity-50"
+          >
+            <Play className="h-3.5 w-3.5" />
+            <span>Test Saga Rollback</span>
+          </button>
+        </div>
+
+        {/* Terminal Log Output */}
+        <div className="rounded-2xl border border-white/10 bg-black/40 p-4 text-left font-mono text-xs text-accent/80 space-y-1.5 h-64 overflow-y-auto flex flex-col shadow-inner">
+          <div className="flex items-center gap-1.5 text-foreground/45 border-b border-white/5 pb-1.5 mb-2 font-bold font-sans uppercase">
+            <Terminal className="h-4 w-4" />
+            <span>Live Simulation Terminal Output</span>
+          </div>
+          {testLogs.map((log, index) => (
+            <div key={index} className="whitespace-pre-wrap leading-relaxed">
+              {log}
+            </div>
+          ))}
         </div>
       </div>
     </div>

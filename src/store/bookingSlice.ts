@@ -47,7 +47,7 @@ const initialState: BookingState = {
   queuePosition: 0,
   queueEta: 0,
   bookingStep: 'browse',
-  checkoutTimer: 0,
+  checkoutTimer: 300,
   paymentProcessing: false,
   paymentSuccess: false,
 };
@@ -92,6 +92,9 @@ const bookingSlice = createSlice({
     },
     setBookingStep: (state, action: PayloadAction<BookingState['bookingStep']>) => {
       state.bookingStep = action.payload;
+      if (action.payload === 'details') {
+        state.checkoutTimer = 300;
+      }
     },
     startCheckoutTimer: (state, action: PayloadAction<number>) => {
       state.checkoutTimer = action.payload;
@@ -113,7 +116,7 @@ const bookingSlice = createSlice({
       state.queuePosition = 0;
       state.queueEta = 0;
       state.bookingStep = 'browse';
-      state.checkoutTimer = 0;
+      state.checkoutTimer = 300;
       state.paymentProcessing = false;
       state.paymentSuccess = false;
     }

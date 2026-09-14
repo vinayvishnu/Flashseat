@@ -1,111 +1,94 @@
-import { createApi, fakeBaseQuery } from '@reduxjs/toolkit/query/react';
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { Match } from '../store/bookingSlice';
 
-// Simulated match repository
-let mockMatches: Match[] = [
-  {
-    id: 'match-1',
-    title: 'Mumbai Indians vs Chennai Super Kings',
+// Helper to convert backend event payload to Match interface
+const mapEventToMatch = (event: any): Match => {
+  const homeTeamName = event.title.includes('vs') ? event.title.split(' vs ')[0] : 'Home Team';
+  const awayTeamName = event.title.includes('vs') ? event.title.split(' vs ')[1] : 'Away Team';
+
+  const homeShort = homeTeamName.split(' ').map((w: string) => w[0]).join('').slice(0, 3).toUpperCase();
+  const awayShort = awayTeamName.split(' ').map((w: string) => w[0]).join('').slice(0, 3).toUpperCase();
+
+  return {
+    id: event._id,
+    title: event.title,
     teams: {
-      home: { name: 'Mumbai Indians', short: 'MI', logo: '⚡', color: '#004BA0' },
-      away: { name: 'Chennai Super Kings', short: 'CSK', logo: '🦁', color: '#FDB913' }
+      home: { name: homeTeamName, short: homeShort, logo: '⚡', color: '#004BA0' },
+      away: { name: awayTeamName, short: awayShort, logo: '🦁', color: '#FDB913' }
     },
-    time: 'May 12, 2026 - 19:30 IST',
-    stadium: 'Wankhede Stadium, Mumbai',
-    ticketPriceVIP: 7500,
-    ticketPricePremium: 3500,
-    ticketPriceGeneral: 1500,
-    totalSeats: 300,
-    availableSeats: 142,
+    time: new Date(event.date).toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }) + ' IST',
+    stadium: event.stadiumId?.name || 'Stadium',
+    ticketPriceVIP: event.basePrice * 3,
+    ticketPricePremium: Math.round(event.basePrice * 1.8),
+    ticketPriceGeneral: event.basePrice,
+    totalSeats: 204, // 24 VIP + 60 Prem + 120 Gen
+    availableSeats: 204,
     isFlashSaleActive: true,
-    flashSaleStartTime: '2026-06-24T20:00:00Z',
-  },
-  {
-    id: 'match-2',
-    title: 'Royal Challengers Bengaluru vs Kolkata Knight Riders',
-    teams: {
-      home: { name: 'Royal Challengers Bengaluru', short: 'RCB', logo: '👑', color: '#EC1C24' },
-      away: { name: 'Kolkata Knight Riders', short: 'KKR', logo: '🍇', color: '#3A225D' }
-    },
-    time: 'May 14, 2026 - 19:30 IST',
-    stadium: 'M. Chinnaswamy Stadium, Bengaluru',
-    ticketPriceVIP: 8000,
-    ticketPricePremium: 4000,
-    ticketPriceGeneral: 1800,
-    totalSeats: 300,
-    availableSeats: 210,
-    isFlashSaleActive: false,
-    flashSaleStartTime: '2026-06-25T18:00:00Z',
-  },
-  {
-    id: 'match-3',
-    title: 'Delhi Capitals vs Rajasthan Royals',
-    teams: {
-      home: { name: 'Delhi Capitals', short: 'DC', logo: '🐯', color: '#0078BC' },
-      away: { name: 'Rajasthan Royals', short: 'RR', logo: '🏛️', color: '#EA1A85' }
-    },
-    time: 'May 16, 2026 - 19:30 IST',
-    stadium: 'Arun Jaitley Stadium, Delhi',
-    ticketPriceVIP: 6500,
-    ticketPricePremium: 3000,
-    ticketPriceGeneral: 1200,
-    totalSeats: 300,
-    availableSeats: 295,
-    isFlashSaleActive: false,
-    flashSaleStartTime: '2026-06-27T12:00:00Z',
-  }
-];
+    flashSaleStartTime: event.date,
+  };
+};
 
 export const iplApi = createApi({
   reducerPath: 'iplApi',
-  baseQuery: fakeBaseQuery(),
-  tagTypes: ['Match', 'Ticket'],
+  baseQuery: fetchBaseQuery({
+    baseUrl: 'http://localhost:5000/api/v1',
+    prepareHeaders: (headers) => {
+      // Read from sessionStorage (per-tab) to match where authSlice stores the token.
+      // This allows separate admin/user sessions in different tabs.
+      const token = sessionStorage.getItem('token');
+      if (token) {
+        headers.set('authorization', `Bearer ${token}`);
+      }
+      return headers;
+    },
+  }),
+  tagTypes: ['Match', 'Ticket', 'Seat'],
   endpoints: (builder) => ({
     getMatches: builder.query<Match[], void>({
-      queryFn: async () => {
-        // Simulate network latency
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        return { data: mockMatches };
+      query: () => '/events',
+      transformResponse: (response: { success: boolean; data: any[] }) => {
+        return response.data.map(mapEventToMatch);
       },
       providesTags: ['Match'],
     }),
     getMatchById: builder.query<Match, string>({
-      queryFn: async (id) => {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        const match = mockMatches.find((m) => m.id === id);
-        if (!match) {
-          return { error: { status: 404, statusText: 'Match Not Found', data: null } };
-        }
-        return { data: match };
+      query: (id) => `/events/${id}`,
+      transformResponse: (response: { success: boolean; data: any }) => {
+        return mapEventToMatch(response.data);
       },
       providesTags: (_result, _error, id) => [{ type: 'Match', id }],
     }),
-    purchaseTickets: builder.mutation<
-      { success: boolean; transactionId: string; ticketsBooked: string[] },
-      { matchId: string; seats: string[]; totalAmount: number; paymentDetails: any }
-    >({
-      queryFn: async ({ matchId, seats, totalAmount }) => {
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate payment processing delay
-        
-        // update local stock
-        const match = mockMatches.find((m) => m.id === matchId);
-        if (match) {
-          match.availableSeats = Math.max(0, match.availableSeats - seats.length);
-        }
-
-        const transactionId = `TXN-IPL-${Date.now().toString().slice(-6)}`;
-        return {
-          data: {
-            success: true,
-            transactionId,
-            ticketsBooked: seats,
-          },
-        };
+    getEventSeats: builder.query<any[], string>({
+      query: (id) => `/events/${id}/seats`,
+      transformResponse: (response: { success: boolean; data: any[] }) => {
+        return response.data;
       },
-      invalidatesTags: ['Match'],
+      providesTags: ['Seat'],
+    }),
+    startBooking: builder.mutation<
+      { success: boolean; data: { bookingId: string; eventId: string; seatNumber: string; message: string } },
+      { eventId: string; seatNumber: string }
+    >({
+      query: (body) => ({
+        url: '/booking/start',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Seat'],
     }),
   }),
 });
 
-export const { useGetMatchesQuery, useGetMatchByIdQuery, usePurchaseTicketsMutation } = iplApi;
+export const { 
+  useGetMatchesQuery, 
+  useGetMatchByIdQuery, 
+  useGetEventSeatsQuery,
+  useStartBookingMutation 
+} = iplApi;
 export default iplApi;

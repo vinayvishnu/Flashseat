@@ -8,7 +8,7 @@ import {
   unlockSeatsExternally, 
   setBookingStep 
 } from '../../store/bookingSlice';
-import { useGetMatchByIdQuery } from '../../services/api';
+import { useGetMatchByIdQuery, useGetEventSeatsQuery, useStartBookingMutation } from '../../services/api';
 import { socket } from '../../services/socket';
 import { Users, Info, Shield, Layers, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -17,7 +17,7 @@ export const StadiumSeatSelection: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const { selectedMatchId, selectedSeats, lockedSeatsByOthers, bookedSeats } = useSelector(
+  const { selectedMatchId, selectedSeats } = useSelector(
     (state: RootState) => state.booking
   );
 
@@ -26,6 +26,20 @@ export const StadiumSeatSelection: React.FC = () => {
   });
 
   const [activeCategory, setActiveCategory] = useState<'ALL' | 'VIP' | 'PREM' | 'GEN'>('ALL');
+
+  const { data: seatData, refetch: refetchSeats } = useGetEventSeatsQuery(selectedMatchId || '', {
+    skip: !selectedMatchId,
+  });
+
+  const [startBooking] = useStartBookingMutation();
+
+  const lockedSeatsByOthers = seatData
+    ? seatData.filter((s: any) => s.status === 'LOCKED').map((s: any) => s.seatNumber)
+    : [];
+
+  const bookedSeats = seatData
+    ? seatData.filter((s: any) => s.status === 'SOLD').map((s: any) => s.seatNumber)
+    : [];
 
   // Load real-time socket events for locking/unlocking seats
   useEffect(() => {
@@ -36,39 +50,43 @@ export const StadiumSeatSelection: React.FC = () => {
 
     socket.connect();
 
-    const handleSeatLocked = (data: { seatId: string }) => {
-      dispatch(lockSeatsExternally([data.seatId]));
+    const handleSeatUpdate = (data: { eventId: string }) => {
+      if (data.eventId === selectedMatchId) {
+        refetchSeats();
+      }
     };
 
-    const handleSeatUnlocked = (data: { seatId: string }) => {
-      dispatch(unlockSeatsExternally([data.seatId]));
-    };
-
-    socket.on('seat_locked', handleSeatLocked);
-    socket.on('seat_unlocked', handleSeatUnlocked);
+    socket.on('seat:update', handleSeatUpdate);
 
     return () => {
-      socket.off('seat_locked', handleSeatLocked);
-      socket.off('seat_unlocked', handleSeatUnlocked);
+      socket.off('seat:update', handleSeatUpdate);
     };
-  }, [selectedMatchId, navigate, dispatch]);
+  }, [selectedMatchId, navigate, refetchSeats]);
 
-  const handleSeatClick = (seatId: string) => {
+  const handleSeatClick = async (seatId: string) => {
     if (bookedSeats.includes(seatId) || lockedSeatsByOthers.includes(seatId)) {
       return; // seat is unavailable
     }
 
-    // Emit event to mock locking a seat on server
     if (selectedSeats.includes(seatId)) {
-      socket.emit('unlock_seat_attempt', { seatId });
+      // Toggle locally
       dispatch(toggleSeatSelection(seatId));
     } else {
       if (selectedSeats.length >= 4) {
         alert('Anti-scalping rule: Maximum 4 tickets can be booked per user.');
         return;
       }
-      socket.emit('lock_seat_attempt', { seatId, matchId: selectedMatchId });
-      dispatch(toggleSeatSelection(seatId));
+      try {
+        const res = await startBooking({ eventId: selectedMatchId!, seatNumber: seatId }).unwrap();
+        if (res.success) {
+          dispatch(toggleSeatSelection(seatId));
+          // Store the booking ID for tracking the Saga progress
+          sessionStorage.setItem(`booking_${seatId}`, res.data.bookingId);
+        }
+      } catch (err: any) {
+        alert(err.data?.error || 'Failed to lock seat. It may have been locked by another user.');
+        refetchSeats();
+      }
     }
   };
 

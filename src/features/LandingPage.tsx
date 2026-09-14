@@ -44,9 +44,22 @@ export const LandingPage: React.FC = () => {
   const { data: matches, isLoading } = useGetMatchesQuery();
   const { isAuthenticated } = useSelector((state: RootState) => state.auth);
   
-  // Real-time server state simulation (from admin config override if present)
-  const adminMatches = useSelector((state: RootState) => state.admin.matches);
-  const displayMatches = adminMatches || matches;
+  // Real-time server state simulation: always merge admin overrides on top of
+  // API data so admin changes broadcast via socket appear instantly for users.
+  const { matches: adminMatches, isGlobalSalePaused } = useSelector((state: RootState) => state.admin);
+  const baseMatches = (matches && matches.length > 0) ? matches : adminMatches;
+  const displayMatches = baseMatches.map((apiMatch) => {
+    const adminOverride = adminMatches.find((am) => am.id === apiMatch.id);
+    if (!adminOverride) return apiMatch;
+    return {
+      ...apiMatch,
+      isFlashSaleActive: isGlobalSalePaused ? false : adminOverride.isFlashSaleActive,
+      availableSeats: adminOverride.availableSeats,
+      ticketPriceVIP: adminOverride.ticketPriceVIP,
+      ticketPricePremium: adminOverride.ticketPricePremium,
+      ticketPriceGeneral: adminOverride.ticketPriceGeneral,
+    };
+  });
 
   const handleEnterSale = (matchId: string) => {
     if (!isAuthenticated) {
@@ -74,7 +87,7 @@ export const LandingPage: React.FC = () => {
           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider mb-6"
         >
           <Flame className="h-3.5 w-3.5 animate-bounce" />
-          <span>Tata IPL 2026 Ticket Node</span>
+          <span>Tata IPL Ticket Node</span>
         </motion.div>
 
         <motion.h1

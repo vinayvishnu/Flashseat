@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { setSelectedMatch } from '../store/bookingSlice';
+import { useGetMatchesQuery } from '../services/api';
 import { Ticket as TicketIcon, Calendar, Wallet, Settings, Shield, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -10,7 +11,24 @@ export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { user, tickets } = useSelector((state: RootState) => state.auth);
-  const { matches } = useSelector((state: RootState) => state.admin);
+  const { matches: adminMatches, isGlobalSalePaused } = useSelector((state: RootState) => state.admin);
+  const { data: matchesData } = useGetMatchesQuery();
+
+  // Always merge admin overrides on top of API data so real-time admin changes
+  // (broadcast via socket) are immediately visible to users without a refresh.
+  const baseMatches = (matchesData && matchesData.length > 0) ? matchesData : adminMatches;
+  const matches = baseMatches.map((apiMatch) => {
+    const adminOverride = adminMatches.find((am) => am.id === apiMatch.id);
+    if (!adminOverride) return apiMatch;
+    return {
+      ...apiMatch,
+      isFlashSaleActive: isGlobalSalePaused ? false : adminOverride.isFlashSaleActive,
+      availableSeats: adminOverride.availableSeats,
+      ticketPriceVIP: adminOverride.ticketPriceVIP,
+      ticketPricePremium: adminOverride.ticketPricePremium,
+      ticketPriceGeneral: adminOverride.ticketPriceGeneral,
+    };
+  });
 
   if (!user) return null;
 

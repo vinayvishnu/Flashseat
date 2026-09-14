@@ -15,6 +15,7 @@ import MyTickets from './features/tickets/MyTickets';
 import UserProfile from './features/auth/UserProfile';
 import AdminDashboard from './features/admin/AdminDashboard';
 import AnalyticsDashboard from './features/admin/AnalyticsDashboard';
+import { useAdminSync } from './hooks/useAdminSync';
 
 // Route guards
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -28,6 +29,9 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 export const App: React.FC = () => {
+  // Globally listen for admin config broadcast events and sync user store in real-time
+  useAdminSync();
+
   return (
     <Router>
       <Layout>

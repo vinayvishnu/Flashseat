@@ -11,7 +11,8 @@ import {
   setPaymentSuccess
 } from '../../store/bookingSlice';
 import { addTicket } from '../../store/authSlice';
-import { usePurchaseTicketsMutation } from '../../services/api';
+import { useGetMatchByIdQuery } from '../../services/api';
+import { socket } from '../../services/socket';
 import { Clock, ShieldCheck, CreditCard, ChevronRight, User, Mail, Phone, CheckCircle, Ticket, Calendar, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -29,10 +30,11 @@ export const BookingStatusPage: React.FC = () => {
   } = useSelector((state: RootState) => state.booking);
   
   const { user } = useSelector((state: RootState) => state.auth);
+  const { data: dbMatch } = useGetMatchByIdQuery(selectedMatchId || '', {
+    skip: !selectedMatchId,
+  });
   const adminMatches = useSelector((state: RootState) => state.admin.matches);
-  const match = adminMatches.find(m => m.id === selectedMatchId);
-
-  const [purchaseTickets] = usePurchaseTicketsMutation();
+  const match = dbMatch || adminMatches.find(m => m.id === selectedMatchId);
 
   // Attendee state inputs
   const [attendees, setAttendees] = useState<Record<string, string>>({});
@@ -46,6 +48,7 @@ export const BookingStatusPage: React.FC = () => {
   const [payMethod, setPayMethod] = useState<'wallet' | 'card'>('wallet');
 
   const [txnId, setTxnId] = useState('');
+  const [progressMessage, setProgressMessage] = useState('');
 
   // Countdown timer activation
   useEffect(() => {
@@ -96,7 +99,7 @@ export const BookingStatusPage: React.FC = () => {
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!match || !user) return;
+    if (!match || !user || selectedSeats.length === 0) return;
 
     const totalCost = calculateTotal();
     if (payMethod === 'wallet' && user.walletBalance < totalCost) {
@@ -105,22 +108,36 @@ export const BookingStatusPage: React.FC = () => {
     }
 
     dispatch(setPaymentProcessing(true));
+    setProgressMessage('Connecting to booking ledger queue...');
 
-    try {
-      const result = await purchaseTickets({
-        matchId: match.id,
-        seats: selectedSeats,
-        totalAmount: totalCost,
-        paymentDetails: payMethod === 'wallet' ? { method: 'wallet' } : { method: 'card', cardNumber }
-      }).unwrap();
+    // 1. Get the booking ID from sessionStorage
+    const bookingId = sessionStorage.getItem(`booking_${selectedSeats[0]}`);
+    if (!bookingId) {
+      alert('No lock found for selected seats. Please select seats again.');
+      dispatch(setPaymentProcessing(false));
+      dispatch(resetBooking());
+      navigate('/dashboard');
+      return;
+    }
 
-      if (result.success) {
-        setTxnId(result.transactionId);
+    // 2. Connect to the WebSocket room for this booking ID
+    socket.connect();
+    socket.emit('join', bookingId);
+    console.log(`[Socket] Requested to join room: ${bookingId}`);
+
+    // 3. Register listener for progress updates
+    socket.on('booking:progress', (data: { status: string; message: string }) => {
+      console.log('[Socket -> booking:progress]', data);
+      setProgressMessage(data.message);
+
+      if (data.status === 'CONFIRMED') {
+        const generatedTxnId = bookingId;
+        setTxnId(generatedTxnId);
         dispatch(setPaymentSuccess(true));
         
         // Add ticket to user history
         dispatch(addTicket({
-          id: result.transactionId,
+          id: generatedTxnId,
           matchId: match.id,
           matchTitle: match.title,
           matchTime: match.time,
@@ -128,18 +145,23 @@ export const BookingStatusPage: React.FC = () => {
           seats: selectedSeats,
           totalPaid: totalCost,
           status: 'confirmed',
-          qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${result.transactionId}-${selectedSeats.join('-')}`,
+          qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${generatedTxnId}-${selectedSeats.join('-')}`,
           bookingDate: new Date().toISOString(),
           gateNo: getSeatCategory(selectedSeats[0]) === 'VIP' ? 'Gate 1, VIP Pavilion' : 'Gate 4, Stand B',
         }));
 
         dispatch(setBookingStep('success'));
+        dispatch(setPaymentProcessing(false));
+        // clean up listeners
+        socket.off('booking:progress');
+      } else if (data.status === 'FAILED') {
+        alert(data.message || 'Booking failed.');
+        dispatch(setPaymentProcessing(false));
+        dispatch(resetBooking());
+        navigate('/dashboard');
+        socket.off('booking:progress');
       }
-    } catch (err) {
-      alert('Payment processing failed. Please try again.');
-    } finally {
-      dispatch(setPaymentProcessing(false));
-    }
+    });
   };
 
   // Timer format display
@@ -424,7 +446,7 @@ export const BookingStatusPage: React.FC = () => {
                   {paymentProcessing ? (
                     <>
                       <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Settling Ticket Reserve Ledger...</span>
+                      <span>{progressMessage}</span>
                     </>
                   ) : (
                     <span>Settle Ticket Payment</span>

@@ -34,7 +34,7 @@ interface AuthState {
 const initialTickets: Ticket[] = [
   {
     id: 'TXN-IPL-2026-9821',
-    matchId: 'match-1',
+    matchId: '60d5ecb8b311234567890300',
     matchTitle: 'Mumbai Indians vs Chennai Super Kings',
     matchTime: 'May 12, 2026 - 19:30 IST',
     stadiumName: 'Wankhede Stadium, Mumbai',
@@ -47,34 +47,53 @@ const initialTickets: Ticket[] = [
   }
 ];
 
-const initialState: AuthState = {
-  user: {
-    id: 'usr-4482',
-    name: 'Vinay Kumar',
-    email: 'vinay@flashseat.ai',
-    role: 'user',
-    walletBalance: 25000,
-    bookingLimit: 4,
-  },
-  isAuthenticated: true,
-  tickets: initialTickets,
-  loading: false,
-  error: null,
+const getInitialState = (): AuthState => {
+  try {
+    // Using sessionStorage so each browser tab has its own independent session.
+    // This allows Tab 1 (User) and Tab 2 (Admin) to coexist without overwriting
+    // each other, and each tab's session survives a page refresh.
+    const storedUser = sessionStorage.getItem('user');
+    const storedToken = sessionStorage.getItem('token');
+    if (storedUser && storedToken) {
+      return {
+        user: JSON.parse(storedUser),
+        isAuthenticated: true,
+        tickets: initialTickets,
+        loading: false,
+        error: null,
+      };
+    }
+  } catch (e) {
+    console.error('Failed to parse auth state', e);
+  }
+  return {
+    user: null,
+    isAuthenticated: false,
+    tickets: initialTickets,
+    loading: false,
+    error: null,
+  };
 };
+
+const initialState: AuthState = getInitialState();
 
 const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    loginSuccess: (state, action: PayloadAction<User>) => {
+    loginSuccess: (state, action: PayloadAction<any>) => {
       state.user = action.payload;
       state.isAuthenticated = true;
       state.error = null;
+      sessionStorage.setItem('user', JSON.stringify(action.payload));
+      sessionStorage.setItem('token', action.payload.token);
     },
     logout: (state) => {
       state.user = null;
       state.isAuthenticated = false;
       state.tickets = [];
+      sessionStorage.removeItem('user');
+      sessionStorage.removeItem('token');
     },
     updateProfile: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {

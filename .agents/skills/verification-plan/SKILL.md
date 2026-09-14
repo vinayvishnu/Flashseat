@@ -68,10 +68,28 @@ When this skill is triggered or when you are testing the FlashSeat backend/front
 
 ---
 
-## 3. Automation Scripts Directory (Draft)
+## 3. Automation Test Suites (Implemented)
 
-We will maintain these testing scripts inside the `tests/` directory:
-*   `tests/integration/auth.test.ts` (REST API Validation)
-*   `tests/concurrency/redisLock.test.ts` (Race Condition Verification)
-*   `tests/load/artillery-config.yml` (100k User Simulation)
-*   `tests/e2e/bookingFlow.spec.ts` (Playwright E2E Browser script)
+The following test suites have been implemented and are ready to run:
+
+### A. Backend Tests (`server/` directory)
+*   **Jest Integration Tests (Supertest)**: `tests/api.test.ts`
+    *   *Verify*: Auth registration, login, profile routing, and match queries.
+    *   *Run*: `npm run test`
+*   **Authentication API Script**: `tests/integration/auth.test.ts`
+    *   *Verify*: Basic REST endpoints using Node native fetch.
+    *   *Run*: `npx ts-node tests/integration/auth.test.ts`
+*   **Concurrency Race Conditions**: `tests/concurrency/redisLock.test.ts`
+    *   *Verify*: Redis distributed locking with parallel requests.
+    *   *Run*: `npx ts-node tests/concurrency/redisLock.test.ts`
+*   **Live Saga E2E Script**: `tests/e2e/bookingFlow.test.ts`
+    *   *Verify*: Seat locking, room joining, and background Saga updates via Socket.io.
+    *   *Run*: `npx ts-node tests/e2e/bookingFlow.test.ts`
+*   **Artillery Performance Config**: `tests/load/artillery-config.yml`
+    *   *Verify*: Concurrency throughput limits under heavy load.
+    *   *Run*: `artillery run tests/load/artillery-config.yml`
+
+### B. Frontend E2E Tests (Root directory)
+*   **Playwright Browser E2E Test**: `tests/e2e/bookingFlow.spec.ts`
+    *   *Verify*: Navigating to page, login redirection, queue countdown wait, stadium seat selection, attendee form submission, wallet payment, and confirmation screen.
+    *   *Run*: `npx playwright test`

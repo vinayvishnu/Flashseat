@@ -14,22 +14,41 @@ export const Register: React.FC = () => {
   const [walletBalance, setWalletBalance] = useState(15000);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     if (!name || !email || !password) {
       setError('Please fill in all fields');
       return;
     }
 
-    dispatch(loginSuccess({
-      id: `usr-${Math.floor(Math.random() * 9000) + 1000}`,
-      name,
-      email,
-      role: 'user',
-      walletBalance,
-      bookingLimit: 4,
-    }));
-    navigate('/dashboard');
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const resData = await response.json();
+
+      if (!response.ok || !resData.success) {
+        setError(resData.error || 'Registration failed');
+        return;
+      }
+
+      const userData = resData.data;
+      dispatch(loginSuccess({
+        id: userData._id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role.toLowerCase(),
+        token: userData.token,
+        walletBalance,
+        bookingLimit: 4,
+      }));
+      navigate('/dashboard');
+    } catch (err) {
+      setError('Connection refused: Make sure your server is running.');
+    }
   };
 
   return (

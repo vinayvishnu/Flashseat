@@ -1,0 +1,45 @@
+config:
+  target: "http://localhost:5000/api/v1"
+  phases:
+    - duration: 30
+      arrivalRate: 2
+      name: Warm up phase
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 15
+      name: Stress spike phase
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  - name: "Acquire Redis Lock & Queue Booking via Kafka"
+    flow:
+      # 1. Register a random mock user for registration validation
+      - post:
+          url: "/auth/register"
+          json:
+            name: "Load Test User"
+            email: "load_test_{{ $uuid }}@example.com"
+            password: "SecureLoadPassword123!"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+      
+      # 2. Get active events list
+      - get:
+          url: "/events"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          capture:
+            - json: "$.data[0]._id"
+              as: "eventId"
+      
+      # 3. Simulate high-speed seat locking requests
+      - post:
+          url: "/booking/start"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            eventId: "{{ eventId }}"
+            seatNumber: "C-GEN-{{ $randomInt(1, 120) }}"

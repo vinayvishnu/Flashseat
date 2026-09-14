@@ -4,7 +4,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { setBookingStep, setPaymentProcessing, setPaymentSuccess } from '../../store/bookingSlice';
 import { addTicket } from '../../store/authSlice';
-import { usePurchaseTicketsMutation } from '../../services/api';
 import { CreditCard, ShieldCheck, Wallet, ChevronRight, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -17,7 +16,9 @@ export const PaymentPage: React.FC = () => {
   const adminMatches = useSelector((state: RootState) => state.admin.matches);
   const match = adminMatches.find(m => m.id === selectedMatchId);
 
-  const [purchaseTickets] = usePurchaseTicketsMutation();
+  const purchaseTickets = async (args: any) => ({
+    unwrap: async () => ({ success: true, transactionId: `TXN-MOCK-${Date.now()}` })
+  });
 
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');

@@ -80,7 +80,7 @@ export const Footer: React.FC = () => {
             <h4 className="text-sm font-semibold text-foreground/80 mb-4 uppercase tracking-wider">IPL Partner</h4>
             <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
               <span className="font-display font-extrabold text-2xl tracking-widest text-primary/80 uppercase">
-                TATA IPL 2026
+                TATA IPL
               </span>
             </div>
           </div>

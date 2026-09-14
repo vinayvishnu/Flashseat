@@ -12,46 +12,76 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     if (!email || !password) {
       setError('Please fill in all fields');
       return;
     }
 
-    // Default simulation login
-    dispatch(loginSuccess({
-      id: 'usr-4482',
-      name: 'Vinay Kumar',
-      email: email,
-      role: email.includes('admin') ? 'admin' : 'user',
-      walletBalance: 25000,
-      bookingLimit: 4,
-    }));
-    navigate('/dashboard');
-  };
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const resData = await response.json();
+      
+      if (!response.ok || !resData.success) {
+        setError(resData.error || 'Authentication failed');
+        return;
+      }
 
-  const handleShortcutLogin = (role: 'user' | 'admin') => {
-    if (role === 'admin') {
+      const userData = resData.data;
       dispatch(loginSuccess({
-        id: 'adm-007',
-        name: 'Admin Controller',
-        email: 'admin@flashseat.ai',
-        role: 'admin',
-        walletBalance: 100000,
-        bookingLimit: 10,
-      }));
-    } else {
-      dispatch(loginSuccess({
-        id: 'usr-4482',
-        name: 'Vinay Kumar',
-        email: 'vinay@flashseat.ai',
-        role: 'user',
+        id: userData._id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role.toLowerCase(),
+        token: userData.token,
         walletBalance: 25000,
         bookingLimit: 4,
       }));
+      navigate('/dashboard');
+    } catch (err) {
+      setError('Connection refused: Make sure your server is running.');
     }
-    navigate('/dashboard');
+  };
+
+  const handleShortcutLogin = async (role: 'user' | 'admin') => {
+    setError('');
+    const credentials = role === 'admin' 
+      ? { email: 'admin@flashseat.com', password: 'admin123' }
+      : { email: 'demo@example.com', password: 'user123' };
+
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials),
+      });
+      const resData = await response.json();
+
+      if (!response.ok || !resData.success) {
+        setError(resData.error || 'Shortcut login failed');
+        return;
+      }
+
+      const userData = resData.data;
+      dispatch(loginSuccess({
+        id: userData._id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role.toLowerCase(),
+        token: userData.token,
+        walletBalance: role === 'admin' ? 100000 : 25000,
+        bookingLimit: role === 'admin' ? 10 : 4,
+      }));
+      navigate('/dashboard');
+    } catch (err) {
+      setError('Connection refused: Make sure your server is running.');
+    }
   };
 
   return (
